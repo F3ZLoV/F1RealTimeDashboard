@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+kds_out/
+samples/
+replay_data.js
+replay_full.js
+tyre_model.pt
+*.png
+infra/.terraform/
+infra/*.tfstate*
+infra/terraform.tfvars
+infra/build/
