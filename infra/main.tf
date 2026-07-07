@@ -8,7 +8,6 @@
 resource "aws_kinesis_stream" "telemetry" {
   name             = "${var.prefix}-telemetry"
   shard_count      = 1
-  retention_period = 24 # 시간 (기본값, 길게 잡으면 비용↑)
 
   stream_mode_details {
     stream_mode = "PROVISIONED"
@@ -33,10 +32,6 @@ resource "aws_dynamodb_table" "telemetry" {
   }
 
   # 오래된 실시간 데이터 자동 정리 (TTL) — 비용 절감
-  ttl {
-    attribute_name = "expire_at"
-    enabled        = true
-  }
 }
 
 # ── S3 데이터 레이크 (아카이브 + ML 학습 데이터) ──

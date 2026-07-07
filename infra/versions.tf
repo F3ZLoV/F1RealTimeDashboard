@@ -10,10 +10,7 @@ terraform {
 
 provider "aws" {
   region = var.region
-  default_tags {
-    tags = {
-      Project   = "F1RealTimeDashboard"
-      ManagedBy = "Terraform"
-    }
+  ignore_tags {
+    key_prefixes = ["group", "username"]
   }
 }
