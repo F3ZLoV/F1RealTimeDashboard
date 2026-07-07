@@ -1,0 +1,13 @@
+# 이 파일을 terraform.tfvars 로 복사해서 값을 채운다.
+# Role ARN 3개는 관리자(리셀러)가 사전 생성 후 전달받아 입력.
+
+region = "us-east-1"
+prefix = "f1dash"
+
+# 관리자에게 받은 Role ARN (예시 형식)
+firehose_role_arn     = "arn:aws:iam::<ACCOUNT_ID>:role/<FIREHOSE_ROLE>"
+lambda_role_arn       = "arn:aws:iam::<ACCOUNT_ID>:role/<LAMBDA_ROLE>"
+fargate_task_role_arn = "arn:aws:iam::<ACCOUNT_ID>:role/<FARGATE_ROLE>"
+
+# 크레딧/오류 알림 이메일
+alert_email = "you@example.com"

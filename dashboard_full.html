@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1 Telemetry · Full Replay</title>
+<style>
+  :root{
+    --bg:#0B0F14; --panel:#131A24; --panel-2:#0F151D;
+    --line:#1E2733; --text:#E6EAF0; --muted:#6B7685;
+    --throttle:#36D399; --brake:#F0506E; --drs:#22D3EE; --ai:#A78BFA;
+    --mono:"SFMono-Regular",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);
+    height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;gap:18px;padding:13px 22px;
+    border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .title{font-weight:700;letter-spacing:.04em;font-size:15px}
+  .title span{color:var(--muted);font-weight:500}
+  .clock{font-family:var(--mono);font-size:20px;font-variant-numeric:tabular-nums;
+    letter-spacing:.05em;margin-left:auto}
+  .clock small{color:var(--muted);font-size:11px;margin-left:6px}
+  button{background:var(--panel);color:var(--text);border:1px solid var(--line);
+    border-radius:7px;padding:8px 15px;font-family:var(--sans);font-size:13px;
+    cursor:pointer;font-weight:600}
+  button:hover{border-color:#2C3947}
+  button:focus-visible{outline:2px solid var(--drs);outline-offset:2px}
+  .speed-ctrl{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--muted)}
+  .speed-ctrl button{padding:6px 10px}
+  .speed-ctrl button.active{border-color:var(--drs);color:var(--drs)}
+
+  main{flex:1;display:grid;grid-template-columns:1fr 300px;gap:1px;
+    background:var(--line);min-height:0}
+  .track-wrap{background:var(--bg);position:relative;display:flex;
+    align-items:center;justify-content:center}
+  canvas#track{max-width:100%;max-height:100%}
+  .track-label{position:absolute;top:14px;left:16px;font-family:var(--mono);
+    font-size:11px;color:var(--muted);letter-spacing:.12em}
+
+  /* 타이밍 타워 */
+  aside{background:var(--panel-2);overflow-y:auto;display:flex;flex-direction:column}
+  .tower{padding:8px}
+  .row{display:grid;grid-template-columns:14px 1fr auto auto;gap:8px;align-items:center;
+    padding:7px 9px;border-radius:6px;cursor:pointer;font-size:13px}
+  .row:hover{background:var(--panel)}
+  .row.sel{background:var(--panel);outline:1px solid var(--ai)}
+  .row .dot{width:9px;height:9px;border-radius:2px}
+  .row .acr{font-family:var(--mono);font-weight:700;letter-spacing:.05em}
+  .row .lap{font-family:var(--mono);color:var(--muted);font-size:11px}
+  .row .cmp{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;
+    border:1px solid var(--line);color:var(--muted)}
+  .cmp.SOFT{color:#F0506E;border-color:#F0506E55}
+  .cmp.MEDIUM{color:#FFD43B;border-color:#FFD43B55}
+  .cmp.HARD{color:#E6EAF0;border-color:#44505E}
+
+  /* 선택 드라이버 디테일 */
+  .detail{border-top:1px solid var(--line);padding:16px 18px}
+  .d-head{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+  .d-head .dot{width:12px;height:12px;border-radius:3px}
+  .d-head .acr{font-family:var(--mono);font-weight:700;font-size:15px}
+  .d-head .team{font-size:11px;color:var(--muted);margin-left:auto}
+  .speed-row{display:flex;align-items:baseline;gap:7px;margin-bottom:10px}
+  .spd{font-family:var(--mono);font-size:38px;font-weight:700;line-height:1;
+    font-variant-numeric:tabular-nums}
+  .spd-u{font-size:12px;color:var(--muted)}
+  .gear{margin-left:auto;text-align:center}
+  .gear b{font-family:var(--mono);font-size:26px;font-weight:700;display:block;line-height:1}
+  .gear small{font-size:9px;color:var(--muted);letter-spacing:.1em}
+  .bars{display:flex;flex-direction:column;gap:7px;margin-bottom:8px}
+  .bar-row{display:flex;align-items:center;gap:9px}
+  .bar-lbl{font-size:10px;color:var(--muted);width:16px;font-family:var(--mono)}
+  .bar{flex:1;height:7px;background:var(--panel);border-radius:4px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;transition:width .06s linear}
+  .bar.t i{background:var(--throttle)} .bar.b i{background:var(--brake)}
+  .drs{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+    padding:3px 8px;border-radius:5px;border:1px solid var(--line);color:var(--muted);margin-top:4px}
+  .drs.on{color:var(--drs);border-color:var(--drs);background:rgba(34,211,238,.08)}
+
+  /* AI 마모 패널 */
+  .ai-panel{border-top:1px solid var(--line);padding:16px 18px}
+  .ai-title{font-size:11px;color:var(--ai);letter-spacing:.1em;font-weight:700;
+    margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .ai-stat{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+  .ai-stat b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .ai-stat .muted{color:var(--muted)}
+  canvas#deg{width:100%;height:120px;margin-top:10px;display:block}
+  .ai-note{font-size:10px;color:var(--muted);margin-top:8px;line-height:1.5}
+
+  footer{padding:13px 22px;border-top:1px solid var(--line);background:var(--panel-2)}
+  input[type=range]{width:100%;accent-color:var(--drs);cursor:pointer}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
+  code{background:var(--panel);padding:2px 7px;border-radius:4px;font-family:var(--mono);
+    font-size:12px;color:var(--text)}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">FORMULA 1 <span>· Full Replay + AI</span></div>
+  <button id="play">▶ 재생</button>
+  <div class="speed-ctrl">속도
+    <button data-spd="1" class="active">1×</button>
+    <button data-spd="4">4×</button>
+    <button data-spd="8">8×</button>
+  </div>
+  <div class="clock"><span id="clock">0:00.0</span><small>경과</small></div>
+</header>
+
+<main>
+  <div class="track-wrap">
+    <div class="track-label" id="circuitLabel">CIRCUIT</div>
+    <canvas id="track" width="860" height="780"></canvas>
+  </div>
+  <aside>
+    <div class="tower" id="tower"></div>
+    <div class="detail" id="detail"></div>
+    <div class="ai-panel" id="aiPanel"></div>
+  </aside>
+</main>
+
+<footer><input type="range" id="scrub" min="0" max="1000" value="0" step="1"></footer>
+
+<script src="replay_full.js"></script>
+<script>
+const data = window.REPLAY;
+const cv = document.getElementById('track'), ctx = cv.getContext('2d');
+
+if(!data || !data.drivers){
+  document.querySelector('main').innerHTML =
+    '<div class="empty">리플레이 데이터가 없습니다.<br><br>'+
+    '먼저 <code>python build_replay_full.py</code> 실행 →<br>'+
+    '<code>replay_full.js</code> 생성 후 이 파일을 여세요.</div>';
+  throw new Error('no data');
+}
+
+// 좌표 변환
+const pad=50, b=data.bounds;
+const s=Math.min((cv.width-pad*2)/(b.maxX-b.minX),(cv.height-pad*2)/(b.maxY-b.minY));
+const px=x=>pad+(x-b.minX)*s, py=y=>cv.height-(pad+(y-b.minY)*s);
+
+let maxT=0;
+data.drivers.forEach(d=>{if(d.frames.length)maxT=Math.max(maxT,d.frames.at(-1).t)});
+
+let selected = data.drivers[0].number;
+const ptr = {}; data.drivers.forEach(d=>ptr[d.number]=0);
+
+function frameAt(d,t){
+  const fr=d.frames, k=d.number;
+  while(ptr[k]<fr.length-1 && fr[ptr[k]+1].t<=t) ptr[k]++;
+  while(ptr[k]>0 && fr[ptr[k]].t>t) ptr[k]--;
+  const a=fr[ptr[k]], nx=fr[Math.min(ptr[k]+1,fr.length-1)];
+  const sp=nx.t-a.t, r=sp>0?Math.min(1,Math.max(0,(t-a.t)/sp)):0;
+  // DRS는 인접 두 프레임 중 ON이면 ON으로 (짧은 활성 구간 놓침 방지)
+  const drsOn=[10,12,14];
+  const drs = drsOn.includes(nx.drs) ? nx.drs : a.drs;
+  return {x:a.x+(nx.x-a.x)*r, y:a.y+(nx.y-a.y)*r,
+    speed:a.speed, gear:a.gear, throttle:a.throttle, brake:a.brake,
+    drs:drs, lap:a.lap, comp:a.comp, age:a.age};
+}
+
+function drawTrack(){
+  const path=data.drivers[0].frames;
+  ctx.strokeStyle='#1E2733'; ctx.lineWidth=13; ctx.lineJoin='round';
+  ctx.beginPath();
+  path.forEach((f,i)=>{const X=px(f.x),Y=py(f.y); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});
+  ctx.stroke();
+}
+
+function fmtClock(t){const m=Math.floor(t/60),s=(t%60).toFixed(1).padStart(4,'0');return `${m}:${s}`}
+
+// 타이밍 타워 (현재 랩 내림차순 = 대략적 순위)
+function buildTower(state){
+  const tower=document.getElementById('tower');
+  const ordered=[...data.drivers].map(d=>({d,f:state[d.number]}))
+    .sort((a,b)=> (b.f.lap-a.f.lap) || (a.d.number-b.d.number));
+  tower.innerHTML='';
+  ordered.forEach(({d,f})=>{
+    const row=document.createElement('div');
+    row.className='row'+(d.number===selected?' sel':'');
+    row.onclick=()=>{selected=d.number; render(clock); buildTower(state)};
+    row.innerHTML=`<span class="dot" style="background:${d.colour}"></span>
+      <span class="acr">${d.acronym}</span>
+      <span class="lap">L${f.lap||1}</span>
+      <span class="cmp ${f.comp||''}">${f.comp?f.comp[0]:'-'}</span>`;
+    tower.appendChild(row);
+  });
+}
+
+function renderDetail(d,f){
+  const drsOn=[10,12,14].includes(f.drs);
+  document.getElementById('detail').innerHTML=`
+    <div class="d-head"><span class="dot" style="background:${d.colour}"></span>
+      <span class="acr">${d.acronym}</span><span class="team">${d.team}</span></div>
+    <div class="speed-row"><span class="spd">${f.speed??0}</span>
+      <span class="spd-u">km/h</span>
+      <div class="gear"><b>${(f.gear===0||f.gear==null)?'N':f.gear}</b><small>GEAR</small></div></div>
+    <div class="bars">
+      <div class="bar-row"><span class="bar-lbl">THR</span>
+        <div class="bar t"><i style="width:${f.throttle??0}%"></i></div></div>
+      <div class="bar-row"><span class="bar-lbl">BRK</span>
+        <div class="bar b"><i style="width:${f.brake?100:0}%"></i></div></div>
+    </div>
+    <span class="drs${drsOn?' on':''}">${drsOn?'DRS ●':'DRS'}</span>`;
+}
+
+function renderAI(d,f){
+  const panel=document.getElementById('aiPanel');
+  if(!d.deg_curve || f.comp==null){
+    panel.innerHTML='<div class="ai-title">⬡ AI 타이어 분석</div>'+
+      '<div class="ai-note">현재 타이어 데이터 없음 (피트/차고 구간)</div>';
+    return;
+  }
+  const age=f.age??0;
+  const cur=d.deg_curve[Math.min(age,d.deg_curve.length-1)];
+  const next5=d.deg_curve[Math.min(age+5,d.deg_curve.length-1)];
+  const dr=(next5-cur)/5;  // 향후 5랩 평균 마모율
+  panel.innerHTML=`
+    <div class="ai-title">⬡ AI 타이어 분석</div>
+    <div class="ai-stat"><span class="muted">컴파운드 / 타이어 나이</span>
+      <b>${f.comp} · ${age}랩</b></div>
+    <div class="ai-stat"><span class="muted">예측 랩타임</span><b>${cur?.toFixed(2)}s</b></div>
+    <div class="ai-stat"><span class="muted">마모율 (향후 5랩)</span>
+      <b style="color:${dr>0.05?'#F0506E':'#36D399'}">${dr>=0?'+':''}${dr.toFixed(3)}s/lap</b></div>
+    <canvas id="deg" width="260" height="120"></canvas>
+    <div class="ai-note">모델이 예측한 현재 컴파운드(${f.comp})의 마모 곡선.
+      세로선=현재 타이어 나이. SageMaker 추론 엔드포인트로 대체될 자리.</div>`;
+  drawDeg(d.deg_curve, age);
+}
+
+function drawDeg(curve, age){
+  const c=document.getElementById('deg'); if(!c)return;
+  const g=c.getContext('2d'), W=c.width, H=c.height, P=22;
+  g.clearRect(0,0,W,H);
+  const vals=curve.filter(v=>v!=null); if(!vals.length)return;
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  const X=i=>P+(i/(curve.length-1))*(W-P*1.2);
+  const Y=v=>H-P-((v-mn)/((mx-mn)||1))*(H-P*1.8);
+  // 곡선
+  g.strokeStyle='#A78BFA'; g.lineWidth=2; g.beginPath();
+  curve.forEach((v,i)=>{if(v==null)return; const x=X(i),y=Y(v); i?g.lineTo(x,y):g.moveTo(x,y)});
+  g.stroke();
+  // 현재 나이 마커
+  const ax=X(Math.min(age,curve.length-1));
+  g.strokeStyle='#22D3EE'; g.lineWidth=1.5; g.setLineDash([3,3]);
+  g.beginPath(); g.moveTo(ax,P*0.5); g.lineTo(ax,H-P*0.7); g.stroke(); g.setLineDash([]);
+  // 라벨
+  g.fillStyle='#6B7685'; g.font='10px monospace';
+  g.fillText(mn.toFixed(0)+'s',2,Y(mn)); g.fillText('age',W-22,H-6);
+}
+
+function render(t){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  drawTrack();
+  const state={};
+  // 비선택 차 먼저, 선택 차 위에
+  data.drivers.forEach(d=>{state[d.number]=frameAt(d,t)});
+  data.drivers.forEach(d=>{
+    if(d.number===selected)return;
+    const f=state[d.number];
+    ctx.beginPath(); ctx.arc(px(f.x),py(f.y),5,0,7); ctx.fillStyle=d.colour;
+    ctx.globalAlpha=.55; ctx.fill(); ctx.globalAlpha=1;
+  });
+  const sd=data.drivers.find(d=>d.number===selected), sf=state[selected];
+  ctx.beginPath(); ctx.arc(px(sf.x),py(sf.y),9,0,7); ctx.fillStyle=sd.colour;
+  ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font='bold 12px monospace';
+  ctx.fillText(sd.acronym, px(sf.x)+13, py(sf.y)+4);
+
+  renderDetail(sd,sf); renderAI(sd,sf);
+  document.getElementById('clock').textContent=fmtClock(t);
+  document.getElementById('scrub').value=(t/maxT)*1000;
+  return state;
+}
+
+document.getElementById('circuitLabel').textContent=`SESSION ${data.session_key} · ${data.drivers.length} CARS`;
+
+let playing=false, clock=0, spd=1, last=0, towerTick=0;
+function loop(ts){
+  if(!playing)return;
+  if(last) clock+=(ts-last)/1000*spd; last=ts;
+  if(clock>=maxT){clock=maxT;playing=false;document.getElementById('play').textContent='▶ 재생'}
+  const state=render(clock);
+  if(++towerTick%15===0) buildTower(state); // 타워는 가끔만 갱신(순위 변동)
+  if(playing) requestAnimationFrame(loop);
+}
+const playBtn=document.getElementById('play');
+playBtn.onclick=()=>{playing=!playing;
+  playBtn.textContent=playing?'❚❚ 일시정지':'▶ 재생';
+  if(playing){if(clock>=maxT)clock=0; last=0; requestAnimationFrame(loop)}};
+document.querySelectorAll('.speed-ctrl button').forEach(btn=>{
+  btn.onclick=()=>{spd=+btn.dataset.spd;
+    document.querySelectorAll('.speed-ctrl button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active')}});
+document.getElementById('scrub').oninput=e=>{
+  clock=(e.target.value/1000)*maxT;
+  Object.keys(ptr).forEach(k=>ptr[k]=0);
+  buildTower(render(clock))};
+
+buildTower(render(0));
+</script>
+</body>
+</html>
