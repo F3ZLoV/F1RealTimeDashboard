@@ -62,23 +62,6 @@ resource "aws_lambda_function" "query" {
 }
 
 # ── SNS 크레딧/오류 알림 (SES 대신 SNS — 샌드박스 제약 회피) ──
-resource "aws_sns_topic" "alerts" {
-  name = "${var.prefix}-alerts"
-}
 
-resource "aws_sns_topic_subscription" "email" {
-  count     = var.alert_email == "" ? 0 : 1
-  topic_arn = aws_sns_topic.alerts.arn
-  protocol  = "email"
-  endpoint  = var.alert_email
-}
 
-# ── EventBridge: SageMaker 엔드포인트 오토셧다운 스케줄 ──
-# (엔드포인트는 SDK로 띄우므로 여기선 "끄는 스케줄"만 준비)
-# 매일 한국시간 새벽 3시(UTC 18시)에 셧다운 Lambda 호출하는 룰 예시.
-resource "aws_cloudwatch_event_rule" "nightly_shutdown" {
-  name                = "${var.prefix}-nightly-shutdown"
-  description         = "유휴 시간 SageMaker 엔드포인트 자동 종료"
-  schedule_expression = "cron(0 18 * * ? *)"
-}
-# 대상(셧다운 Lambda)은 엔드포인트 구성 후 연결. 지금은 룰만 생성.
+

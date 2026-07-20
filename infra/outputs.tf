@@ -32,7 +32,3 @@ output "dashboard_url" {
   value       = "https://${aws_cloudfront_distribution.dashboard.domain_name}"
 }
 
-output "sns_topic_arn" {
-  description = "Budgets 크레딧 알림 연결용 SNS 토픽"
-  value       = aws_sns_topic.alerts.arn
-}
