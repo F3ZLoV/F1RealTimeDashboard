@@ -50,7 +50,7 @@ resource "aws_cloudfront_origin_access_control" "dashboard" {
 
 resource "aws_cloudfront_distribution" "dashboard" {
   enabled             = true
-  default_root_object = "dashboard_full.html"
+  default_root_object = "index.html"
   comment             = "${var.prefix} dashboard"
 
   origin {
@@ -64,6 +64,10 @@ resource "aws_cloudfront_distribution" "dashboard" {
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
     forwarded_values {
       query_string = false
       cookies { forward = "none" }
