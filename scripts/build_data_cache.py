@@ -83,6 +83,36 @@ def season_results(season):
     return out
 
 
+def season_qualifying(season):
+    """예선도 결과와 같은 방식으로 페이지네이션해 모은다."""
+    races = {}
+    offset = 0
+    total = None
+    while True:
+        data = fetch(f"{season}/qualifying/", f"limit={PAGE}&offset={offset}")
+        mr = data["MRData"]
+        if total is None:
+            total = int(mr.get("total", 0))
+            if total == 0:
+                return []
+            print(f"  예선 총 {total}행")
+        for race in mr["RaceTable"]["Races"]:
+            rnd = race["round"]
+            if rnd in races:
+                races[rnd]["QualifyingResults"].extend(race.get("QualifyingResults", []))
+            else:
+                races[rnd] = race
+        offset += PAGE
+        if offset >= total:
+            break
+        time.sleep(0.3)
+
+    out = sorted(races.values(), key=lambda r: int(r["round"]))
+    for r in out:
+        r["QualifyingResults"].sort(key=lambda x: int(x["position"]))
+    return out
+
+
 def season_schedule(season):
     data = fetch(f"{season}/races/", "limit=100")
     return data["MRData"]["RaceTable"]["Races"]
@@ -116,6 +146,9 @@ def main():
             results = season_results(season)
             if results:
                 put(f"results-{season}", results)
+            quali = season_qualifying(season)
+            if quali:
+                put(f"qualifying-{season}", quali)
             schedule = season_schedule(season)
             if schedule:
                 put(f"schedule-{season}", schedule)
