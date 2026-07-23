@@ -34,6 +34,7 @@ aws s3 sync "$OUT_DIR/_next/static" "s3://${BUCKET}/_next/static" \
 echo "── 2) 나머지 업로드 (즉시 반영) ──"
 aws s3 sync "$OUT_DIR" "s3://${BUCKET}" \
   --exclude "_next/static/*" \
+  --exclude "data/*" \
   --cache-control "public,max-age=0,must-revalidate" \
   --delete
 

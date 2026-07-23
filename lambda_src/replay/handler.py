@@ -149,6 +149,49 @@ def cache_put(key, payload):
         print(f"[cache] 저장 실패(무시): {e}")
 
 
+
+def sector_points(laps, loc_by, t0):
+    """
+    섹터 경계 좌표 — 랩의 섹터별 소요시간을 절대 시각으로 환산한 뒤
+    그 순간 차량이 어디 있었는지 찾는다. (S1→S2, S2→S3 두 지점)
+
+    어느 API도 섹터 분할 지점의 좌표를 주지 않지만,
+    laps 의 duration_sector_1/2 와 date_start 로 정확히 역산할 수 있다.
+    """
+    # 좌표가 가장 촘촘한 드라이버를 기준으로
+    if not loc_by:
+        return []
+    ref = max(loc_by.items(), key=lambda kv: len(kv[1]))
+    num, points = ref
+    pts = sorted(points, key=lambda r: r["date"])
+    p_ts = [ts(r["date"]) for r in pts]
+
+    def at(t):
+        i = bisect_left(p_ts, t)
+        if i <= 0:
+            return None
+        if i >= len(pts):
+            return None
+        a, b = pts[i - 1], pts[i]
+        return a if abs(p_ts[i - 1] - t) <= abs(p_ts[i] - t) else b
+
+    for lp in laps:
+        if lp.get("driver_number") != num or not lp.get("date_start"):
+            continue
+        s1, s2 = lp.get("duration_sector_1"), lp.get("duration_sector_2")
+        if not s1 or not s2:
+            continue
+        start = ts(lp["date_start"])
+        p1 = at(start + int(s1 * 1000))
+        p2 = at(start + int((s1 + s2) * 1000))
+        if p1 and p2:
+            return [
+                {"n": 2, "x": p1["x"], "y": p1["y"]},
+                {"n": 3, "x": p2["x"], "y": p2["y"]},
+            ]
+    return []
+
+
 # ── 빌드 ─────────────────────────────────────────────
 def build(session_key, start_off, dur, hz):
     sessions = of1("sessions", {"session_key": session_key})
@@ -292,6 +335,7 @@ def build(session_key, start_off, dur, hz):
         "chunk": {"start": start_off, "dur": dur, "hz": hz},
         "total_dur": total_dur,
         "drivers": out,
+        "sectors": sector_points(laps, loc_by, t0),
         "bounds": ({"minX": min_x, "maxX": max_x, "minY": min_y, "maxY": max_y}
                    if out else None),
     }
