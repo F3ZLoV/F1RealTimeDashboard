@@ -2,6 +2,17 @@
 #  리플레이 백엔드 — 청크 빌더 + 세션 목록 Lambda, API 라우트
 #  프론트(Next.js 정적 빌드)는 S3+CloudFront, 데이터는 여기로.
 # ════════════════════════════════════════════════════════════
+# ⚠️ Lambda 는 Terraform state 에서 제외되어 CLI 로 관리한다.
+#    ControlOnlyOwnResources 정책이 lambda:GetFunction 을 explicit deny 하여,
+#    CreateFunction 은 성공해도 provider 가 생성 확인 단계에서 실패한다.
+#    (태그를 걸 권한이 없어 태그 조건으로도 통과 불가)
+#
+#    코드 갱신:
+#      cd lambda_src/<name> && zip -qr /tmp/<name>.zip .
+#      aws lambda update-function-code --function-name inhatc-202647019-<name> \
+#        --zip-file fileb:///tmp/<name>.zip
+#
+#    이 블록은 아키텍처 문서 역할로 남겨둔다. 제약 없는 계정에서는 그대로 동작한다.
 
 data "archive_file" "replay_zip" {
   type        = "zip"

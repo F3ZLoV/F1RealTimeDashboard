@@ -2,6 +2,16 @@
 #  수집/저장 핵심 인프라
 #  데이터 흐름: Fargate → KDS → (Firehose→S3) + (Lambda→DynamoDB)
 # ════════════════════════════════════════════════════════════
+# ⚠️ 현재 이 스트림은 생성되어 있지 않다 (terraform state rm 으로 제외).
+#
+#  1) SafePowerUser 가 kinesis:IncreaseStreamRetentionPeriod 를 막아
+#     생성 직후 provider 가 보존기간을 맞추려다 실패로 처리한다.
+#  2) 리플레이는 Lambda → S3 캐시 경로로 대체되어 KDS 를 쓰지 않는다.
+#  3) 유휴 상태로도 샤드당 시간당 $0.015 가 과금된다.
+#
+# 실시간(OpenF1 MQTT) 도입 시 그랑프리 주말에만 CLI 로 만들고 이후 삭제할 것.
+#   aws kinesis create-stream --stream-name inhatc-202647019-telemetry --shard-count 1
+#   aws kinesis delete-stream --stream-name ... --enforce-consumer-deletion
 
 # ── Kinesis Data Streams (실시간 수집 버퍼) ──
 # 견적 검증: 20명 × 3.7Hz ≈ 75 rec/s → 1샤드(1000 rec/s)로 충분
@@ -59,6 +69,9 @@ resource "aws_s3_bucket_public_access_block" "dashboard" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# ⚠️ KDS 에 의존하므로 함께 미생성 상태. 태그 권한 문제로 Terraform 이 아니라
+#    CLI 로 만들어야 한다 (scripts/deploy.sh 참고).
 
 # ── Data Firehose: KDS → Parquet → S3 데이터레이크 ──
 # 견적: Parquet 변환 활성. Role은 관리자가 사전 생성한 ARN 사용.
